@@ -56,7 +56,7 @@ def getVehicle(vjson, location, time):
     for k, v in vjson.items():
         box = np.asarray(v[0])
         # 计算车辆中心
-        center = (sum(box) / 4)
+        center = (sum(box) / len(box))
 
         # 获取中心真实坐标
         realC = realCoordinate(
@@ -144,10 +144,10 @@ for key, value in vehicleJson.items():
 vehicles = calcVehicleDetail(vehicles)
 
 # 头指向示意图
-ax = vehicles.plot(kind='scatter', x='x', y='y', s=(vehicles.id.astype(int) + 1)
-                   * 50, title='总体头指向示意图', alpha=0.5)
+ax = vehicles.plot(kind='scatter', x='x', y='y',
+                   s=10, title='总体头指向示意图', alpha=0.5)
 ax.quiver(vehicles.x, vehicles.y, vehicles.vx, vehicles.vy,
-          color='orange', width=0.01, alpha=0.8)
+          color='orange', width=0.01, alpha=0.6)
 ax.set_aspect(1)
 plt.savefig(prefix_path + 'output/position.png', dpi=300)
 
@@ -163,6 +163,6 @@ for i in ids:
     ax = idata.plot(
         kind='scatter', x='x', y='y', s=30, title='目标%s的头指向示意图' % i, alpha=0.5)
     ax.quiver(idata.x, idata.y, idata.vx, idata.vy,
-              color='orange', width=0.01, alpha=0.8)
+              color='orange', width=0.01, alpha=0.6)
     ax.set_aspect(1)
     plt.savefig(prefix_path + 'output/ph-%s.png' % i, dpi=300)
