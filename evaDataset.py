@@ -14,9 +14,9 @@ plt.rcParams['axes.unicode_minus'] = False
 def realCoordinate(c, c0, theta):
     """获取车辆 _真实_ 地址."""
     c = np.asarray(c)
-    c0 = np.asarray(c0)
+    c0 = np.asarray([c0[1], -c0[0]])
     # 计算相对于图片中心的位置并把单位转换成米
-    c0 = (c0 - (360, 640)) * [27 / 720, 48 / 1280]
+    c0 = (c0 - (640, 360)) * [48 / 1280, 27 / 720]
 
     theta = -theta
     rot = np.array([[np.cos(theta), -np.sin(theta)],
@@ -54,7 +54,7 @@ def getVehicle(vjson, location, time):
     vehicles = []
 
     for k, v in vjson.items():
-        box = np.asarray(v[0])
+        box = np.asarray(v)
         # 计算车辆中心
         center = (sum(box) / len(box))
 
@@ -68,7 +68,7 @@ def getVehicle(vjson, location, time):
         )
 
         # 计算长宽比
-        w_h = getW_h(box)
+        w_h = 0  # getW_h(box)
 
         vid = k
         ids.add(k)
@@ -122,7 +122,7 @@ def calcVehicleDetail(vehicles):
 vehicles = []
 locations = dict()
 
-prefix_path = 'images/'
+prefix_path = '2022-3-24/'
 
 # 获取location数据
 for (dirpath, dirnames, filenames) in walk(prefix_path + "location/"):
@@ -148,13 +148,13 @@ ax = vehicles.plot(kind='scatter', x='x', y='y',
                    s=10, title='总体头指向示意图', alpha=0.5)
 ax.quiver(vehicles.x, vehicles.y, vehicles.vx, vehicles.vy,
           color='orange', width=0.01, alpha=0.6)
-ax.set_aspect(1)
+ax.set_aspect('equal', adjustable='datalim')
 plt.savefig(prefix_path + 'output/position.png', dpi=300)
 
 # 单个目标绘图
 for i in ids:
     # 速度大小变化趋势
-    vehicles.loc[vehicles.id == i, ['v', 'a', 'time']].iloc[1:].plot(
+    vehicles.loc[vehicles.id == i, ['v', 'a', 'time']].iloc[2:].plot(
         x='time', title='目标%s的速度与加速度折线图' % i)
     plt.savefig(prefix_path + 'output/av-%s.png' % i, dpi=300)
 
@@ -164,5 +164,5 @@ for i in ids:
         kind='scatter', x='x', y='y', s=30, title='目标%s的头指向示意图' % i, alpha=0.5)
     ax.quiver(idata.x, idata.y, idata.vx, idata.vy,
               color='orange', width=0.01, alpha=0.6)
-    ax.set_aspect(1)
+    ax.set_aspect('equal', adjustable='datalim')
     plt.savefig(prefix_path + 'output/ph-%s.png' % i, dpi=300)
