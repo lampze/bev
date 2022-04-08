@@ -85,19 +85,21 @@ def calcVehicleDetail(vehicles, ids):
     for i in ids:
         idata = vehicles.loc[vehicles.id == i].copy()
         for j in range(1, len(idata)):
+            # 用前面第b个时间计算速度与加速度
+            b = min(j, 5)
             jdata = idata.iloc[j].copy()
-            t = (jdata.time - idata.iloc[j - 1].time)
+            t = (jdata.time - idata.iloc[j - b].time)
             # 计算速度：路程的增量除以时间的增量
             c = np.asarray((jdata.x, jdata.y))
-            bc = np.asarray((idata.iloc[j - 1].x, idata.iloc[j - 1].y))
+            bc = np.asarray((idata.iloc[j - b].x, idata.iloc[j - b].y))
             d = (c - bc) / t
             jdata.vx = d[0]
             jdata.vy = d[1]
             # 计算速度的头指向
             jdata.h = np.arctan2(d[1], d[0])
             # 计算加速度：速度的增量除以时间的增量
-            jdata.ax = (jdata.vx - idata.iloc[j - 1].vx) / t
-            jdata.ay = (jdata.vy - idata.iloc[j - 1].vy) / t
+            jdata.ax = (jdata.vx - idata.iloc[j - b].vx) / t
+            jdata.ay = (jdata.vy - idata.iloc[j - b].vy) / t
             # 计算速度与加速度向量的长度
             jdata.v = np.linalg.norm(d)
             jdata.a = np.linalg.norm((jdata.ax, jdata.ay))
