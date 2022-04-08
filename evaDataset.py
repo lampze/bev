@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-from os import walk
+from os import walk, path, mkdir
+import sys
 import json
 import numpy as np
 import pandas as pd
 import cv2
 import matplotlib.pyplot as plt
+from multiprocessing import Pool
 
 plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei']
 plt.rcParams['axes.unicode_minus'] = False
@@ -14,9 +16,10 @@ plt.rcParams['axes.unicode_minus'] = False
 def realCoordinate(c, c0, theta):
     """获取车辆 _真实_ 地址."""
     c = np.asarray(c)
-    c0 = np.asarray([c0[1], -c0[0]])
+    c0 = np.asarray([c0[1], c0[0]])
     # 计算相对于图片中心的位置并把单位转换成米
     c0 = (c0 - (640, 360)) * [48 / 1280, 27 / 720]
+    c0[1] = -c0[1]
 
     theta = -theta
     rot = np.array([[np.cos(theta), -np.sin(theta)],
@@ -24,20 +27,7 @@ def realCoordinate(c, c0, theta):
     return c + np.dot(rot, c0)
 
 
-ids = []
-
-
-def findVid(c):
-    """追踪车辆ID."""
-    for i in range(len(ids)):
-        if np.linalg.norm(c - ids[i]) < 80:
-            ids[i] = c
-            return i
-    ids.append(c)
-    return len(ids) - 1
-
-
-def getW_h(box):
+def calcW_h(box):
     """计算车辆的长宽比."""
     w_h = []
     for j in range(1, 4):
@@ -46,10 +36,7 @@ def getW_h(box):
     return w_h[0] / w_h[2]
 
 
-ids = set()
-
-
-def getVehicle(vjson, location, time):
+def getVehicle(vjson, location, time, ids):
     """获取一张图内每个车辆的基础信息."""
     vehicles = []
 
@@ -91,7 +78,7 @@ def getVehicle(vjson, location, time):
     return vehicles
 
 
-def calcVehicleDetail(vehicles):
+def calcVehicleDetail(vehicles, ids):
     """计算速度加速度之类的详细数据."""
     vehicles = pd.DataFrame(vehicles).sort_values(['time', 'id'])
 
@@ -119,50 +106,64 @@ def calcVehicleDetail(vehicles):
     return vehicles
 
 
-vehicles = []
-locations = dict()
+def evaDataset(datasetPath):
+    vehicles = []
+    locations = dict()
+    ids = set()
 
-prefix_path = '2022-3-24/'
+    outputPath = path.join(datasetPath, 'output')
+    if not path.exists(outputPath):
+        mkdir(outputPath)
 
-# 获取location数据
-for (dirpath, dirnames, filenames) in walk(prefix_path + "location/"):
-    for filename in filenames:
-        with open(dirpath + filename) as f:
-            locations[int(filename.split('.')[0])] = json.load(f)
-    break
+    # 获取location数据
+    for (dirpath, dirnames, filenames) in walk(path.join(datasetPath, "location/")):
+        for filename in filenames:
+            with open(path.join(dirpath, filename)) as f:
+                locations[int(filename.split('.')[0])] = json.load(f)
+        break
 
-# 获取时间戳
-times = pd.read_csv(prefix_path + "time.txt",
-                    header=None, sep='\s+', index_col=0)
+    # 获取时间戳
+    times = pd.read_csv(path.join(datasetPath, "time.txt"),
+                        header=None, sep='\s+', index_col=0)
 
-with open(prefix_path + 'vehicle.json') as f:
-    vehicleJson = json.load(f)
+    with open(path.join(datasetPath, 'vehicle.json')) as f:
+        vehicleJson = json.load(f)
 
-for key, value in vehicleJson.items():
-    i = int(key.split('.')[0])
-    vehicles += getVehicle(value, locations[i], times.loc[i, 1])
-vehicles = calcVehicleDetail(vehicles)
+    for key, value in vehicleJson.items():
+        i = int(key.split('.')[0])
+        vehicles += getVehicle(value, locations[i], times.loc[i, 1], ids)
+    vehicles = calcVehicleDetail(vehicles, ids)
 
-# 头指向示意图
-ax = vehicles.plot(kind='scatter', x='x', y='y',
-                   s=10, title='总体头指向示意图', alpha=0.5)
-ax.quiver(vehicles.x, vehicles.y, vehicles.vx, vehicles.vy,
-          color='orange', width=0.01, alpha=0.6)
-ax.set_aspect('equal', adjustable='datalim')
-plt.savefig(prefix_path + 'output/position.png', dpi=300)
-
-# 单个目标绘图
-for i in ids:
-    # 速度大小变化趋势
-    vehicles.loc[vehicles.id == i, ['v', 'a', 'time']].iloc[2:].plot(
-        x='time', title='目标%s的速度与加速度折线图' % i)
-    plt.savefig(prefix_path + 'output/av-%s.png' % i, dpi=300)
-
-    # 位置
-    idata = vehicles.loc[vehicles.id == i]
-    ax = idata.plot(
-        kind='scatter', x='x', y='y', s=30, title='目标%s的头指向示意图' % i, alpha=0.5)
-    ax.quiver(idata.x, idata.y, idata.vx, idata.vy,
+    # 头指向示意图
+    ax = vehicles.plot(kind='scatter', x='x', y='y',
+                       s=10, title='总体头指向示意图', alpha=0.5)
+    ax.quiver(vehicles.x, vehicles.y, vehicles.vx, vehicles.vy,
               color='orange', width=0.01, alpha=0.6)
     ax.set_aspect('equal', adjustable='datalim')
-    plt.savefig(prefix_path + 'output/ph-%s.png' % i, dpi=300)
+    plt.savefig(path.join(datasetPath, 'output/position.png'), dpi=300)
+    plt.close('all')
+
+    # 单个目标绘图
+    for i in ids:
+        # 速度大小变化趋势
+        vehicles.loc[vehicles.id == i, ['v', 'a', 'time']].iloc[2:].plot(
+            x='time', title='目标%s的速度与加速度折线图' % i)
+        plt.savefig(path.join(datasetPath, 'output/av-%s.png' % i), dpi=300)
+        plt.close('all')
+
+        # 位置
+        idata = vehicles.loc[vehicles.id == i]
+        ax = idata.plot(
+            kind='scatter', x='x', y='y', s=30, title='目标%s的头指向示意图' % i, alpha=0.5)
+        ax.quiver(idata.x, idata.y, idata.vx, idata.vy,
+                  color='orange', width=0.01, alpha=0.6)
+        ax.set_aspect('equal', adjustable='datalim')
+        plt.savefig(path.join(datasetPath, 'output/ph-%s.png' % i), dpi=300)
+        plt.close('all')
+
+
+if __name__ == "__main__":
+    pool = Pool()
+    pool.map(evaDataset, sys.argv[1:])
+    pool.close()
+    pool.join()
