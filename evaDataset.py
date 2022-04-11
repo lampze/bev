@@ -109,34 +109,7 @@ def calcVehicleDetail(vehicles, ids, calcp=5):
     return vehicles
 
 
-def evaDataset(datasetPath):
-    vehicles = []
-    locations = dict()
-    ids = set()
-
-    outputPath = path.join(datasetPath, 'output')
-    if not path.exists(outputPath):
-        mkdir(outputPath)
-
-    # 获取location数据
-    for (dirpath, dirnames, filenames) in walk(path.join(datasetPath, "location/")):
-        for filename in filenames:
-            with open(path.join(dirpath, filename)) as f:
-                locations[int(filename.split('.')[0])] = json.load(f)
-        break
-
-    # 获取时间戳
-    times = pd.read_csv(path.join(datasetPath, "time.txt"),
-                        header=None, sep='\s+', index_col=0)
-
-    with open(path.join(datasetPath, 'vehicle.json')) as f:
-        vehicleJson = json.load(f)
-
-    for key, value in vehicleJson.items():
-        i = int(key.split('.')[0])
-        vehicles += getVehicle(value, locations[i], times.loc[i, 1], ids)
-    vehicles = calcVehicleDetail(vehicles, ids)
-
+def plotDataset(vehicles, datasetPath='', ids=set()):
     # 头指向示意图
     ax = vehicles.plot(kind='scatter', x='x', y='y',
                        s=10, title='总体头指向示意图', alpha=0.5)
@@ -163,6 +136,37 @@ def evaDataset(datasetPath):
         ax.set_aspect('equal', adjustable='datalim')
         plt.savefig(path.join(datasetPath, 'output/ph-%s.png' % i), dpi=300)
         plt.close('all')
+
+
+def evaDataset(datasetPath, isPlot=True):
+    vehicles = []
+    locations = dict()
+    ids = set()
+
+    outputPath = path.join(datasetPath, 'output')
+    if not path.exists(outputPath):
+        mkdir(outputPath)
+
+    # 获取location数据
+    for (dirpath, dirnames, filenames) in walk(path.join(datasetPath, "location/")):
+        for filename in filenames:
+            with open(path.join(dirpath, filename)) as f:
+                locations[int(filename.split('.')[0])] = json.load(f)
+        break
+
+    # 获取时间戳
+    times = pd.read_csv(path.join(datasetPath, "time.txt"),
+                        header=None, sep='\s+', index_col=0)
+
+    with open(path.join(datasetPath, 'vehicle.json')) as f:
+        vehicleJson = json.load(f)
+
+    for key, value in vehicleJson.items():
+        i = int(key.split('.')[0])
+        vehicles += getVehicle(value, locations[i], times.loc[i, 1], ids)
+    vehicles = calcVehicleDetail(vehicles, ids)
+    if isPlot:
+        plotDataset(vehicles, datasetPath, ids)
     return vehicles
 
 
