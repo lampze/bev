@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import cv2
 import matplotlib.pyplot as plt
+import math
 from multiprocessing import Pool
 
 plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei']
@@ -78,7 +79,7 @@ def getVehicle(vjson, location, time, ids):
     return vehicles
 
 
-def calcVehicleDetail(vehicles, ids):
+def calcVehicleDetail(vehicles, ids, calcp=5):
     """计算速度加速度之类的详细数据."""
     vehicles = pd.DataFrame(vehicles).sort_values(['time', 'id'])
 
@@ -86,7 +87,7 @@ def calcVehicleDetail(vehicles, ids):
         idata = vehicles.loc[vehicles.id == i].copy()
         for j in range(1, len(idata)):
             # 用前面第b个时间计算速度与加速度
-            b = min(j, 5)
+            b = min(j, calcp)
             jdata = idata.iloc[j].copy()
             t = (jdata.time - idata.iloc[j - b].time)
             # 计算速度：路程的增量除以时间的增量
@@ -162,6 +163,7 @@ def evaDataset(datasetPath):
         ax.set_aspect('equal', adjustable='datalim')
         plt.savefig(path.join(datasetPath, 'output/ph-%s.png' % i), dpi=300)
         plt.close('all')
+    return vehicles
 
 
 if __name__ == "__main__":
